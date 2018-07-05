@@ -38,8 +38,8 @@ router.get('/:id', (req, res, next) => {
   knex
     .select('notes.id','title','content')
     .from('notes')
-    .where('id', id)
-    .then(result => {
+    .where('notes.id', id)
+    .then(([result]) => {
       if (result){
         res.json(result);
       }else {
