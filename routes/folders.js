@@ -45,7 +45,6 @@ router.put('/:id', (req, res, next) => {
   const updateObj = { 
     name
   };
-  // const updateableFields = ['title', 'content'];
 
   if (!name) {
     const err = new Error('Missing `name` in request body');

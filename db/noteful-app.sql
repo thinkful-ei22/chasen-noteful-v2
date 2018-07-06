@@ -1,8 +1,14 @@
 -- psql -U dev -d noteful-app -f ./db/noteful-app.sql
 
+DROP TABLE IF EXISTS notes_tags;
 DROP TABLE IF EXISTS notes;
 DROP TABLE IF EXISTS folders;
+DROP TABLE IF EXISTS tags;
 
+CREATE TABLE tags(
+  id serial PRIMARY KEY,
+  name text NOT NULL UNIQUE
+);
 
 CREATE TABLE folders(
   id serial PRIMARY KEY,
@@ -18,6 +24,11 @@ CREATE TABLE notes (
     folder_id int REFERENCES folders(id) ON DELETE SET NULL
 );
 ALTER SEQUENCE notes_id_seq RESTART WITH 1000;
+
+CREATE TABLE notes_tags(
+  note_id INTEGER NOT NULL REFERENCES notes ON DELETE CASCADE,
+  tag_id INTEGER NOT NULL REFERENCES tags ON DELETE CASCADE
+  );
 
 INSERT INTO folders(name) VALUES
   ('Archive'),
@@ -76,3 +87,24 @@ INSERT INTO notes (title, content, folder_id) VALUES
     'Posuere sollicitudin aliquam ultrices sagittis orci a. Feugiat sed lectus vestibulum mattis ullamcorper velit.' 
     , NULL
   );
+
+
+  INSERT INTO tags(name) VALUES
+    ('cats'),
+    ('dogs'),
+    ('thinkful'),
+    ('code');
+  
+
+  INSERT INTO notes_tags(note_id, tag_id) VALUES
+    (1000,1), (1000,2),
+    (1001,2),
+    (1002,3),
+    (1003,4),
+    (1004,1),
+    (1005,1),
+    (1006,1),
+    (1007,1),
+    (1008,1);
+  
+  
