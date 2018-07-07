@@ -79,8 +79,8 @@ router.get('/:id', (req, res, next) => {
 
 // Put update an item
 router.put('/:id', (req, res, next) => {
-  const id = req.params.id;
-  const {title, content, folderId} = req.body;
+  const noteId = req.params.id;
+  const {title, content, folderId, tags=[]} = req.body; //tags=[] so if there are no tags will run still
 
   /***** Never trust users - validate input *****/
   const updateObj = { 
@@ -96,24 +96,36 @@ router.put('/:id', (req, res, next) => {
     return next(err);
   }
 
-  let noteId;
-
+  //update note in notes table//
   knex('notes')
     .update(updateObj)
-    .where('id', id)
+    .where('id', noteId)
     .returning('id')
     .then(([id]) => {
-      noteId = id;
-      // Using the new id, select the new note and the folder
-      return knex.select('notes.id', 'title', 'content', 'folder_id as folderId', 'folders.name as folderName')
+      //then delete current related tags from notes_tabs table//
+      return knex('notes_tags')
+        .where('note_id', id)
+        .del();
+    })      
+    .then(() => {
+      //insert related tags into notes_tags table
+      const tagsInsert = tags.map(tagId => ({note_id: noteId, tag_id: tagId}));
+      return knex.insert(tagsInsert).into('notes_tags');
+    }) 
+    .then(() => {
+      //select the new note and leftJoinon folders and tags
+      return knex.select('notes.id', 'title', 'content', 'folder_id as folderId', 'folders.name as folderName','tags.id as tagId', 'tags.name as tagName')
         .from('notes')
         .leftJoin('folders', 'notes.folder_id', 'folders.id')
+        .leftJoin('notes_tags', 'notes.id', 'notes_tags.note_id')
+        .leftJoin('tags', 'tags.id','notes_tags.tag_id')
         .where('notes.id', noteId);
     })
-    .then(([result]) => {
-      if(result){
-        res.json(result);
-      }else{
+    .then(result => {
+      if (result) {
+        const [hydrated] = hydrateNotes(result);
+        res.json(hydrated);
+      } else {
         next();
       }
     })
@@ -125,7 +137,7 @@ router.put('/:id', (req, res, next) => {
 
 // Post (insert) an item
 router.post('/', (req, res, next) => {
-  const { title, content, folderId } = req.body;
+  const { title, content, folderId, tags=[]} = req.body; //tags=[] so if there are no tags will run still
   const newItem = { 
     title, 
     content, 
@@ -139,19 +151,32 @@ router.post('/', (req, res, next) => {
     return next(err);
   }
   let noteId;
+  //Insert new note into table
   knex.insert(newItem)
     .into('notes')
     .returning('id')
     .then(([id]) => {
       noteId = id;
+      //Insert realted tags into notes_tags table
+      const tagsInsert = tags.map(tagId => ({note_id: noteId, tag_id: tagId}));
+      return knex.insert(tagsInsert).into('notes_tags');
+    })
+    .then(() => {
       // Using the new id, select the new note and the folder
-      return knex.select('notes.id', 'title', 'content', 'folder_id as folderId', 'folders.name as folderName')
+      return knex.select('notes.id', 'title', 'content', 'folder_id as folderId', 'folders.name as folderName', 'tags.id as tagId', 'tags.name as tagName')
         .from('notes')
         .leftJoin('folders', 'notes.folder_id', 'folders.id')
+        .leftJoin('notes_tags', 'notes.id', 'notes_tags.note_id')
+        .leftJoin('tags', 'tags.id','notes_tags.tag_id')
         .where('notes.id', noteId);
     })
-    .then(([result]) => {
-      res.json(result).status(201);
+    .then(result => {
+      if (result) {
+        const hydrated = hydrateNotes(result)[0];
+        res.location(`${req.originalUrl}/${hydrated.id}`).status(201).json(hydrated);
+      } else {
+        next();
+      }
     })
     .catch(err => {
       next(err);
